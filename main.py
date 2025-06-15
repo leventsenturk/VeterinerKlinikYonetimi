@@ -2,7 +2,7 @@ import tkinter as tk
 from tkinter import messagebox, ttk
 import mysql.connector
 from datetime import datetime, timedelta
-from PIL import Image, ImageTk # PIL (Pillow) kütüphanesini kullanacağız
+from PIL import Image, ImageTk
 
 # --- Veritabanı Ayarları ---
 DB_CONFIG = {
@@ -44,7 +44,7 @@ class Veritabani:
                 f"Veritabanına bağlanılamadı:\n{err}\\n\\n"
                 "Lütfen MySQL sunucunuzun çalıştığından, kullanıcı adı ve şifrenin doğru olduğundan "
                 "ve 'veteriner_klinik' veritabanının mevcut olduğundan emin olun.",
-                icon="error" # Hata mesajına ikon eklendi
+                icon="error" 
             )
             self.baglanti = None
             return None
@@ -220,14 +220,14 @@ class VeterinerUygulamasi:
         button_container = ttk.Frame(main_frame, style="TFrame")
         button_container.pack(pady=10)
 
-        # Butonları daha büyük ve tutarlı hale getirelim
+        
         button_width = 30
         button_pady = 10
 
-        # Menü düğmeleri (ikonlu)
+        # Menü düğmeleri
         self._create_main_menu_button(button_container, "Hayvan Ekle", self._hayvan_ekle_penceresi, "add_animal", button_width, button_pady)
         self._create_main_menu_button(button_container, "Hayvanları Listele/Yönet", self._hayvanlari_listele_penceresi, "list_animals", button_width, button_pady)
-        self._create_main_menu_button(button_container, "Sahip Ekle", self._sahip_ekle_penceresi, "add_owner", button_width, button_pady)
+        self._create_main_menu_button(button_container, "Sahipleri Listele/Yönet", self._sahipleri_listele_penceresi, "add_owner", button_width, button_pady) 
         self._create_main_menu_button(button_container, "Aşı Takip Sistemi", self._asi_ekle_penceresi, "vaccine", button_width, button_pady)
         self._create_main_menu_button(button_container, "Yaklaşan Aşılar", self._yaklasan_asilar_penceresi, "upcoming_vaccine", button_width, button_pady)
         self._create_main_menu_button(button_container, "Randevu Yönetimi", self._randevulari_listele_penceresi, "appointment", button_width, button_pady)
@@ -238,8 +238,8 @@ class VeterinerUygulamasi:
         """Ana menü düğmelerini ikonlarla oluşturur."""
         btn = ttk.Button(parent, text=text, command=command, style="MainMenu.TButton")
         if self.icons.get(icon_name):
-            btn.config(image=self.icons[icon_name], compound="left") # İkonu sola yerleştir
-        btn.pack(pady=pady, fill="x", ipadx=width) # fill="x" ile düğmelerin genişliği ayarlanabilir
+            btn.config(image=self.icons[icon_name], compound="left") 
+        btn.pack(pady=pady, fill="x", ipadx=width) 
 
     def _create_button_with_icon(self, parent, text, command, icon_name):
         """Küçük düğmeleri ikonlarla oluşturur."""
@@ -269,8 +269,7 @@ class VeterinerUygulamasi:
         
         self._create_button_with_icon(filter_frame, "Filtrele", lambda: yukle_yaklasan_asilar(int(self.gun_sayisi_var.get())), "filter").grid(row=0, column=2, padx=5, pady=5)
         
-        filter_frame.columnconfigure(1, weight=1) # Entry'nin genişlemesini sağlar
-
+        filter_frame.columnconfigure(1, weight=1) 
 
         tree_frame = ttk.Frame(top, style="TFrame")
         tree_frame.pack(fill="both", expand=True, padx=10, pady=10)
@@ -307,7 +306,7 @@ class VeterinerUygulamasi:
                 JOIN hayvanlar h ON at.hayvan_id = h.id
                 WHERE at.sonraki_asi_tarihi IS NOT NULL
                 AND at.sonraki_asi_tarihi BETWEEN %s AND %s
-                ORDER BY at.sonraki_asi_tarihi ASC
+                ORDER BY at.id ASC  -- ID'ye göre küçükten büyüğe sırala
             """
             kayitlar = self.db.sorgu_calistir(sorgu, (bugun.strftime("%Y-%m-%d"), gecerli_tarih.strftime("%Y-%m-%d")), fetch_results=True)
 
@@ -357,8 +356,7 @@ class VeterinerUygulamasi:
 
         hayvan_dict, sahip_dict = self._get_hayvanlar_ve_sahipler()
 
-        # Grid layout için etiket ve giriş/seçim widget'ları
-        # Use a list of (label_text, key_name) for consistent access
+
         fields = [
             ("Hayvan Adı:", "isim"),
             ("Tür:", "tur"),
@@ -515,7 +513,7 @@ class VeterinerUygulamasi:
         top = tk.Toplevel(self.root, bg=COLORS["background"])
         top.title("Sahip Ekle")
         top.grab_set()
-        top.geometry("450x300")
+        top.geometry("450x350")
         top.resizable(False, False)
 
         form_frame = ttk.LabelFrame(top, text="Yeni Sahip Bilgileri", padding="20", style="TLabelframe")
@@ -554,6 +552,148 @@ class VeterinerUygulamasi:
         # En son satır (adres) 2. satırda, bu yüzden buton 3. satıra gelecek
         self._create_button_with_icon(form_frame, "Kaydet", kaydet, "save").grid(row=3, column=0, columnspan=2, pady=15, padx=20, sticky="e")
         
+    # --- Sahip Listeleme ve Yönetimi Penceresi ---
+    def _sahipleri_listele_penceresi(self):
+        top = tk.Toplevel(self.root, bg=COLORS["background"])
+        top.title("Sahipleri Listele")
+        top.grab_set()
+        top.geometry("800x500") 
+
+        # Başlık sola hizalandı
+        ttk.Label(top, text="Kayıtlı Sahipler", font=("Segoe UI", 14, "bold"), 
+                  background=COLORS["background"], foreground=COLORS["primary"]).pack(pady=10, anchor="w", padx=10)
+
+        tree_frame = ttk.Frame(top, style="TFrame")
+        tree_frame.pack(fill="both", expand=True, padx=10, pady=10)
+
+        tree = ttk.Treeview(tree_frame, columns=("ID", "Adı Soyadı", "Telefon", "Adres"), show="headings")
+        tree.pack(side="left", fill="both", expand=True)
+
+        vsb = ttk.Scrollbar(tree_frame, orient="vertical", command=tree.yview)
+        vsb.pack(side="right", fill="y")
+        tree.configure(yscrollcommand=vsb.set)
+
+        tree.heading("ID", text="ID")
+        tree.heading("Adı Soyadı", text="Adı Soyadı")
+        tree.heading("Telefon", text="Telefon")
+        tree.heading("Adres", text="Adres")
+
+        tree.column("ID", width=50, anchor="center")
+        tree.column("Adı Soyadı", width=150, anchor="w")
+        tree.column("Telefon", width=120, anchor="w")
+        tree.column("Adres", width=250, anchor="w")
+
+        def verileri_yukle():
+            for item in tree.get_children():
+                tree.delete(item)
+            # Sorguyu ID'ye göre sıralayacak şekilde güncellendi
+            kayitlar = self.db.sorgu_calistir("SELECT id, isim, telefon, adres FROM sahipler ORDER BY id ASC", fetch_results=True)
+            if kayitlar:
+                for kayit in kayitlar:
+                    tree.insert("", "end", values=kayit)
+            else:
+                messagebox.showinfo("Bilgi", "Kayıtlı sahip bulunamadı.", icon="info")
+        
+        def sahip_sil():
+            secilen_item = tree.selection()
+            if not secilen_item:
+                messagebox.showwarning("Uyarı", "Lütfen silmek istediğiniz sahibi seçin.", icon="warning")
+                return
+
+            sahip_id = tree.item(secilen_item, "values")[0]
+            sahip_adi = tree.item(secilen_item, "values")[1]
+
+            # Sahibe bağlı hayvan var mı kontrol et
+            hayvan_sayisi_sorgu = "SELECT COUNT(*) FROM hayvanlar WHERE sahip_id = %s"
+            hayvan_sayisi_result = self.db.sorgu_calistir(hayvan_sayisi_sorgu, (sahip_id,), fetch_results=True)
+            
+            if hayvan_sayisi_result and hayvan_sayisi_result[0][0] > 0:
+                messagebox.showerror("Hata", f"'{sahip_adi}' adlı sahibe bağlı hayvanlar bulunmaktadır. "
+                                              "Sahibi silmek için önce bu hayvanları başka bir sahibe atamalı veya silmelisiniz.", icon="error")
+                return
+
+            if messagebox.askyesno("Onay", f"'{sahip_adi}' adlı sahibi silmek istediğinize emin misiniz? Bu işlem geri alınamaz.", icon="question"):
+                sorgu = "DELETE FROM sahipler WHERE id=%s"
+                if self.db.sorgu_calistir(sorgu, (sahip_id,), commit=True):
+                    messagebox.showinfo("Silindi", "Sahip başarıyla silindi.", icon="info")
+                    verileri_yukle()
+                else:
+                    messagebox.showerror("Hata", "Sahip silinirken bir hata oluştu.", icon="error")
+
+        def sahip_guncelle():
+            secilen_item = tree.selection()
+            if not secilen_item:
+                messagebox.showwarning("Uyarı", "Lütfen güncellemek istediğiniz sahibi seçin.", icon="warning")
+                return
+            kayit_id = tree.item(secilen_item, "values")[0]
+            self._sahip_guncelle_penceresi(kayit_id, verileri_yukle) # Güncelleme sonrası listeyi yenilemek için callback
+
+        verileri_yukle()
+
+        button_frame = ttk.Frame(top, style="TFrame")
+        button_frame.pack(pady=10)
+
+        self._create_button_with_icon(button_frame, "Sahip Ekle", self._sahip_ekle_penceresi, "add").pack(side="left", padx=7)
+        self._create_button_with_icon(button_frame, "Sahip Sil", sahip_sil, "delete").pack(side="left", padx=7)
+        self._create_button_with_icon(button_frame, "Sahip Güncelle", sahip_guncelle, "update").pack(side="left", padx=7)
+        self._create_button_with_icon(button_frame, "Listeyi Yenile", verileri_yukle, "refresh").pack(side="left", padx=7)
+
+
+    # --- Sahip Güncelleme Penceresi ---
+    def _sahip_guncelle_penceresi(self, kayit_id, callback=None):
+        top = tk.Toplevel(self.root, bg=COLORS["background"])
+        top.title("Sahip Güncelle")
+        top.grab_set()
+        top.geometry("450x350")
+        top.resizable(False, False)
+
+        form_frame = ttk.LabelFrame(top, text=f"Sahip Bilgilerini Güncelle (ID: {kayit_id})", padding="20", style="TLabelframe")
+        form_frame.pack(padx=20, pady=20, fill="both", expand=True)
+
+        sahip_data_list = self.db.sorgu_calistir("SELECT isim, telefon, adres FROM sahipler WHERE id=%s", (kayit_id,), fetch_results=True)
+        if not sahip_data_list:
+            messagebox.showerror("Hata", "Sahip kaydı bulunamadı veya veritabanı hatası.", icon="error")
+            top.destroy()
+            return
+        kayit = sahip_data_list[0]
+
+        ttk.Label(form_frame, text="Adı Soyadı:").grid(row=0, column=0, padx=10, pady=8, sticky="w")
+        isim_entry = ttk.Entry(form_frame)
+        isim_entry.insert(0, kayit[0])
+        isim_entry.grid(row=0, column=1, padx=10, pady=8, sticky="ew")
+
+        ttk.Label(form_frame, text="Telefon:").grid(row=1, column=0, padx=10, pady=8, sticky="w")
+        telefon_entry = ttk.Entry(form_frame)
+        telefon_entry.insert(0, kayit[1])
+        telefon_entry.grid(row=1, column=1, padx=10, pady=8, sticky="ew")
+
+        ttk.Label(form_frame, text="Adres:").grid(row=2, column=0, padx=10, pady=8, sticky="nw")
+        adres_text = tk.Text(form_frame, height=4, width=40, font=("Segoe UI", 10))
+        adres_text.insert("1.0", kayit[2] if kayit[2] else "")
+        adres_text.grid(row=2, column=1, padx=10, pady=8, sticky="ew")
+
+        form_frame.columnconfigure(1, weight=1)
+
+        def guncelle():
+            yeni_isim = isim_entry.get().strip()
+            yeni_telefon = telefon_entry.get().strip()
+            yeni_adres = adres_text.get("1.0", "end-1c").strip()
+
+            if not (yeni_isim and yeni_telefon):
+                messagebox.showerror("Hata", "Lütfen Adı Soyadı ve Telefon alanlarını doldurun.", icon="warning")
+                return
+
+            sorgu = "UPDATE sahipler SET isim=%s, telefon=%s, adres=%s WHERE id=%s"
+            veri = (yeni_isim, yeni_telefon, yeni_adres if yeni_adres else None, kayit_id)
+            if self.db.sorgu_calistir(sorgu, veri, commit=True):
+                messagebox.showinfo("Başarılı", "Sahip kaydı güncellendi.", icon="info")
+                top.destroy()
+                if callback:
+                    callback() # Listeyi yenile
+
+        self._create_button_with_icon(top, "Güncelle", guncelle, "update").pack(pady=15, padx=20, fill="x")
+
+
     # --- Hayvan Güncelleme Penceresi ---
     def _hayvan_guncelle_penceresi(self, kayit_id, callback=None):
         top = tk.Toplevel(self.root, bg=COLORS["background"])
@@ -669,7 +809,8 @@ class VeterinerUygulamasi:
         tree_frame = ttk.Frame(top, style="TFrame")
         tree_frame.pack(fill="both", expand=True, padx=10, pady=10)
 
-        tree = ttk.Treeview(tree_frame, columns=("ID", "İsim", "Tür", "Cins", "Doğum Tarihi", "Geliş Sebebi", "Sahip"), show="headings")
+        # Sütunları güncelle: "Doğum Tarihi" yerine "Yaş"
+        tree = ttk.Treeview(tree_frame, columns=("ID", "İsim", "Tür", "Cins", "Yaş", "Geliş Sebebi", "Sahip"), show="headings")
         tree.pack(side="left", fill="both", expand=True)
 
         vsb = ttk.Scrollbar(tree_frame, orient="vertical", command=tree.yview)
@@ -680,7 +821,7 @@ class VeterinerUygulamasi:
         tree.heading("İsim", text="İsim")
         tree.heading("Tür", text="Tür")
         tree.heading("Cins", text="Cins")
-        tree.heading("Doğum Tarihi", text="Doğum Tarihi")
+        tree.heading("Yaş", text="Yaş")  # Sütun başlığını "Yaş" olarak değiştir
         tree.heading("Geliş Sebebi", text="Geliş Sebebi")
         tree.heading("Sahip", text="Sahip")
 
@@ -688,22 +829,42 @@ class VeterinerUygulamasi:
         tree.column("İsim", width=120, anchor="w")
         tree.column("Tür", width=90, anchor="w")
         tree.column("Cins", width=90, anchor="w")
-        tree.column("Doğum Tarihi", width=110, anchor="center")
+        tree.column("Yaş", width=80, anchor="center") # Yaş sütunu için genişlik ayarı
         tree.column("Geliş Sebebi", width=120, anchor="w")
         tree.column("Sahip", width=150, anchor="w")
 
         def verileri_yukle():
             for item in tree.get_children():
                 tree.delete(item)
+            # Sorguyu ID'ye göre sıralayacak şekilde güncellendi
             kayitlar = self.db.sorgu_calistir("""
                 SELECT h.id, h.isim, h.tur, h.cins, h.dogum_tarihi, h.gelis_sebebi, s.isim
                 FROM hayvanlar h JOIN sahipler s ON h.sahip_id = s.id
-                ORDER BY h.isim ASC
+                ORDER BY h.id ASC 
             """, fetch_results=True)
             if kayitlar:
+                bugun = datetime.now().date()
                 for kayit in kayitlar:
-                    dogum_tarihi_str = kayit[4].strftime("%Y-%m-%d") if kayit[4] else ""
-                    tree.insert("", "end", values=(kayit[0], kayit[1], kayit[2], kayit[3], dogum_tarihi_str, kayit[5], kayit[6]))
+                    hayvan_id, isim, tur, cins, dogum_tarihi, gelis_sebebi, sahip_isim = kayit
+                    
+                    yas_str = "Bilinmiyor"
+                    if dogum_tarihi:
+                        # Yaş hesaplama
+                        age = bugun.year - dogum_tarihi.year - ((bugun.month, bugun.day) < (dogum_tarihi.month, dogum_tarihi.day))
+                        if age > 0:
+                            yas_str = f"{age} yıl"
+                        else:
+                            # 1 yaşından küçükse ayları veya günleri hesapla
+                            delta = bugun - dogum_tarihi
+                            if delta.days < 30:
+                                yas_str = f"{delta.days} gün"
+                            elif delta.days < 365:
+                                months = delta.days // 30 # Yaklaşık ay hesabı
+                                yas_str = f"{months} ay"
+                            else:
+                                yas_str = "1 yaşından küçük" # Nadir durum, ama kapsayıcı olsun
+
+                    tree.insert("", "end", values=(hayvan_id, isim, tur, cins, yas_str, gelis_sebebi, sahip_isim))
             else:
                 messagebox.showinfo("Bilgi", "Kayıtlı hayvan bulunamadı.", icon="info")
         
@@ -852,7 +1013,7 @@ class VeterinerUygulamasi:
         tree.column("Notlar", width=200, anchor="w")
 
         asi_kayitlar = self.db.sorgu_calistir(
-            "SELECT asi_adi, asi_tarihi, sonraki_asi_tarihi, notlar FROM asi_takip WHERE hayvan_id = %s ORDER BY asi_tarihi DESC",
+            "SELECT asi_adi, asi_tarihi, sonraki_asi_tarihi, notlar FROM asi_takip WHERE hayvan_id = %s ORDER BY id ASC", # ID'ye göre sırala
             (hayvan_id,), fetch_results=True
         )
         if asi_kayitlar:
@@ -883,7 +1044,7 @@ class VeterinerUygulamasi:
         tree.column("Durum", width=100, anchor="center")
 
         randevu_kayitlar = self.db.sorgu_calistir(
-            "SELECT randevu_tarihi, aciklama, durum FROM randevular WHERE hayvan_id = %s ORDER BY randevu_tarihi DESC",
+            "SELECT randevu_tarihi, aciklama, durum FROM randevular WHERE hayvan_id = %s ORDER BY id ASC", # ID'ye göre sırala
             (hayvan_id,), fetch_results=True
         )
         if randevu_kayitlar:
@@ -914,7 +1075,7 @@ class VeterinerUygulamasi:
         tree.column("Tedavi Planı", width=180, anchor="w")
 
         muayene_kayitlar = self.db.sorgu_calistir(
-            "SELECT muayene_tarihi, sikayet, teshis, tedavi_plani FROM muayeneler WHERE hayvan_id = %s ORDER BY muayene_tarihi DESC",
+            "SELECT muayene_tarihi, sikayet, teshis, tedavi_plani FROM muayeneler WHERE hayvan_id = %s ORDER BY id ASC", # ID'ye göre sırala
             (hayvan_id,), fetch_results=True
         )
         if muayene_kayitlar:
@@ -1037,11 +1198,12 @@ class VeterinerUygulamasi:
         def randevulari_yukle():
             for item in tree.get_children():
                 tree.delete(item)
+            # Sorguyu ID'ye göre sıralayacak şekilde güncellendi
             randevular = self.db.sorgu_calistir("""
                 SELECT r.id, h.isim, r.randevu_tarihi, r.aciklama, r.durum
                 FROM randevular r
                 JOIN hayvanlar h ON r.hayvan_id = h.id
-                ORDER BY r.randevu_tarihi ASC
+                ORDER BY r.id ASC 
             """, fetch_results=True)
             if randevular:
                 for randevu in randevular:
@@ -1281,11 +1443,12 @@ class VeterinerUygulamasi:
         def muayeneleri_yukle():
             for item in tree.get_children():
                 tree.delete(item)
+            # Sorguyu ID'ye göre sıralayacak şekilde güncellendi
             kayitlar = self.db.sorgu_calistir("""
                 SELECT m.id, h.isim, m.muayene_tarihi, m.sikayet, m.bulgular, m.teshis, m.tedavi_plani
                 FROM muayeneler m
                 JOIN hayvanlar h ON m.hayvan_id = h.id
-                ORDER BY m.muayene_tarihi DESC
+                ORDER BY m.id ASC
             """, fetch_results=True)
             if kayitlar:
                 for kayit in kayitlar:
